@@ -1,0 +1,31 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /api/books",
+  "rawPath": "/api/books",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json",
+    "accept": "application/json"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/api/books",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "curl/7.68.0"
+    },
+    "routeKey": "GET /api/books",
+    "stage": "$default",
+    "accountId": "123456789012",
+    "apiId": "api-id",
+    "domainName": "id.execute-api.us-east-1.amazonaws.com",
+    "domainPrefix": "id",
+    "requestId": "id=",
+    "requestTime": "12/Dec/2025:19:34:04 +0000",
+    "requestTimeEpoch": 1703348444390,
+    "timeEpoch": 1703348444390
+  },
+  "body": null,
+  "isBase64Encoded": false
+}

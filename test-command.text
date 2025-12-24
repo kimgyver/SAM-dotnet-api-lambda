@@ -1,0 +1,5 @@
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzY2NjE3OTUyfQ.21HaKeErQkD1SDPzdr6I8GkEacpaDYIyYceayB_fblE" \
+  https://oveffvl3dk.execute-api.ap-southeast-2.amazonaws.com/api/books
+
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzY2NjE3OTUyfQ.21HaKeErQkD1SDPzdr6I8GkEacpaDYIyYceayB_fblE" \
+  http://localhost:3000/api/books
