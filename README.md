@@ -13,12 +13,42 @@
 
 ## 주요 기능
 
-### 1. JWT 인증
+### 1. JWT 인증 및 역할 기반 권한 제어
 
 - **방식**: HS256 대칭 암호화
 - **검증**: 모든 API 엔드포인트에 JWT 필수
-- **구현**: `JwtValidator.cs`에서 Bearer 토큰 추출 및 서명 검증
+- **구현**: `JwtAuthorizerFunction.cs`에서 Bearer 토큰 추출 및 서명 검증
 - **키**: 환경변수 `JWT_SECRET` (기본값: "your-secret-key-change-this-in-production")
+- **역할 기반 제어**: JWT의 `role` claim을 기반으로 권한 제어
+
+#### 역할 정의
+
+| 역할  | GET | POST | PUT | DELETE |
+| ----- | --- | ---- | --- | ------ |
+| admin | ✅  | ✅   | ✅  | ✅     |
+| user  | ✅  | ❌   | ❌  | ❌     |
+
+#### JWT 토큰 예시
+
+**Admin 토큰:**
+
+```json
+{
+  "sub": "admin-user",
+  "role": "admin",
+  "exp": 1766581288
+}
+```
+
+**User 토큰:**
+
+```json
+{
+  "sub": "normal-user",
+  "role": "user",
+  "exp": 1766581288
+}
+```
 
 ### 2. DynamoDB 통합
 
@@ -30,12 +60,21 @@
 ### 3. API 엔드포인트
 
 ```
-GET    /api/books              - 책 목록 조회 (limit 파라미터 지원)
-GET    /api/books/{id}         - 특정 책 조회
-POST   /api/books              - 책 추가
-PUT    /api/books/{id}         - 책 수정
-DELETE /api/books/{id}         - 책 삭제
+GET    /api/books              - 책 목록 조회 (limit 파라미터 지원) [인증 필수]
+GET    /api/books/{id}         - 특정 책 조회 [인증 필수]
+POST   /api/books              - 책 추가 [Admin만 가능]
+PUT    /api/books/{id}         - 책 수정 [Admin만 가능]
+DELETE /api/books/{id}         - 책 삭제 [Admin만 가능]
 ```
+
+#### 권한별 응답
+
+- **GET**: HTTP 200 (모든 인증된 사용자)
+- **POST/PUT/DELETE (Admin)**: HTTP 200/201 (성공)
+- **POST/PUT/DELETE (User)**: HTTP 403 Forbidden
+  ```json
+  { "message": "Access denied: Only admins can create/update/delete books" }
+  ```
 
 ## Lambda 성능 최적화
 
@@ -130,35 +169,74 @@ dotnet run
 sam local start-api
 ```
 
-**Step 3: JWT 토큰 생성 도구 준비**
+**Step 3: JWT 토큰 생성 (Python)**
 
-JWT 토큰을 생성하기 위한 Node.js 스크립트를 준비합니다:
+Python을 이용해 JWT 토큰을 생성합니다:
 
 ```bash
-# /tmp/generate_jwt.js 생성
-cat > /tmp/generate_jwt.js << 'EOF'
-const crypto = require('crypto');
-const secret = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
-const header = Buffer.from(JSON.stringify({alg: 'HS256', typ: 'JWT'})).toString('base64');
-const payload = Buffer.from(JSON.stringify({sub: 'user123', exp: Math.floor(Date.now() / 1000) + 3600})).toString('base64');
-const signature = crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64');
-console.log(`${header}.${payload}.${signature}`);
+cat > /tmp/gen_tokens.py << 'EOF'
+import base64
+import json
+import hmac
+import hashlib
+from datetime import datetime, timedelta
+
+secret = "your-secret-key-change-this-in-production"
+
+def create_jwt(sub, role):
+    # Header
+    header = {"alg": "HS256", "typ": "JWT"}
+    header_encoded = base64.urlsafe_b64encode(json.dumps(header).encode()).rstrip(b'=').decode()
+
+    # Payload
+    now = datetime.utcnow()
+    exp = int((now + timedelta(hours=1)).timestamp())
+    payload = {"sub": sub, "role": role, "exp": exp}
+    payload_encoded = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b'=').decode()
+
+    # Signature
+    message = f"{header_encoded}.{payload_encoded}"
+    signature = hmac.new(secret.encode(), message.encode(), hashlib.sha256).digest()
+    signature_encoded = base64.urlsafe_b64encode(signature).rstrip(b'=').decode()
+
+    return f"{message}.{signature_encoded}"
+
+admin_token = create_jwt("admin-user", "admin")
+user_token = create_jwt("normal-user", "user")
+
+print("Admin Token (role: admin):")
+print(admin_token)
+print("\nUser Token (role: user):")
+print(user_token)
 EOF
 
-node /tmp/generate_jwt.js
+python3 /tmp/gen_tokens.py
 ```
 
 **Step 4: API 호출 테스트**
 
 ```bash
-# JWT 토큰 생성
-JWT=$(node /tmp/generate_jwt.js)
+# Admin 토큰으로 책 생성 (성공 예상 - HTTP 201)
+curl -X POST http://localhost:5000/api/books \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"550e8400-e29b-41d4-a716-446655440001","title":"Test Book","isbn":"123-4-56789-00-0","authors":["Author Name"]}' \
+  -w "\nHTTP Status: %{http_code}\n"
 
-# API 호출 테스트 (dotnet run 사용 시: localhost:5000)
-curl -H "Authorization: Bearer $JWT" http://localhost:5000/api/books
+# User 토큰으로 책 생성 시도 (거부 예상 - HTTP 403)
+curl -X POST http://localhost:5000/api/books \
+  -H "Authorization: Bearer <USER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"550e8400-e29b-41d4-a716-446655440002","title":"User Book","isbn":"234-5-67890-00-0","authors":["User Author"]}' \
+  -w "\nHTTP Status: %{http_code}\n"
 
-# sam local start-api 사용 시: localhost:3000
-curl -H "Authorization: Bearer $JWT" http://localhost:3000/api/books
+# Admin 토큰으로 책 조회 (성공 예상 - HTTP 200)
+curl -H "Authorization: Bearer <ADMIN_TOKEN>" http://localhost:5000/api/books \
+  -w "\nHTTP Status: %{http_code}\n"
+
+# User 토큰으로 책 조회 (성공 예상 - HTTP 200)
+curl -H "Authorization: Bearer <USER_TOKEN>" http://localhost:5000/api/books \
+  -w "\nHTTP Status: %{http_code}\n"
 ```
 
 **주의**: `AWS_REGION` 환경변수를 설정하지 않으면 로컬에서 DynamoDB 연결 시 실패합니다.
@@ -166,8 +244,29 @@ curl -H "Authorization: Bearer $JWT" http://localhost:3000/api/books
 ### AWS 배포 후 테스트
 
 ```bash
-JWT=$(node /tmp/generate_jwt.js)
-curl -H "Authorization: Bearer $JWT" https://{API_GATEWAY_URL}/api/books
+# JWT 토큰 생성
+python3 /tmp/gen_tokens.py  # 위에서 생성한 스크립트 재사용
+
+# API 엔드포인트 URL 확인
+aws cloudformation describe-stacks \
+  --stack-name ServerlessAPI \
+  --region ap-southeast-2 \
+  --query 'Stacks[0].Outputs[0].OutputValue' \
+  --output text
+
+# Admin으로 책 생성 (성공)
+curl -X POST {API_GATEWAY_URL}/api/books \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"550e8400-e29b-41d4-a716-446655440001","title":"Cloud Book","isbn":"555-6-78901-00-0","authors":["Cloud Author"]}' \
+  -w "\nHTTP Status: %{http_code}\n"
+
+# User으로 책 생성 시도 (거부)
+curl -X POST {API_GATEWAY_URL}/api/books \
+  -H "Authorization: Bearer <USER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"User Book","isbn":"666-7-89012-00-0","authors":["User"]}' \
+  -w "\nHTTP Status: %{http_code}\n"
 ```
 
 ## 로그 확인
