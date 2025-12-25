@@ -1,5 +1,23 @@
-curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzY2NjE3OTUyfQ.21HaKeErQkD1SDPzdr6I8GkEacpaDYIyYceayB_fblE" \
-  https://oveffvl3dk.execute-api.ap-southeast-2.amazonaws.com/api/books
+curl -H "Authorization: Bearer eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWRtaW4tdXNlciIsICJyb2xlIjogImFkbWluIiwgImV4cCI6IDE3NjY1ODEyODh9.4ar7c4X9VHgg1_wEy_I4n3TJerlDlHYZ_sHjq_EMG00" \
+  https://oveffvl3dk.execute-api.ap-southeast-2.amazonaws.com/api/books \
+  -w "\nHTTP Status: %{http_code}\n"
+
+curl -X POST https://oveffvl3dk.execute-api.ap-southeast-2.amazonaws.com/api/books \
+  -H "Authorization: Bearer eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWRtaW4tdXNlciIsICJyb2xlIjogImFkbWluIiwgImV4cCI6IDE3NjY1ODEzODh9.pynidGSD60z6vsllyyxf4bCND442LSEcVT3uK65UCTg" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"550e8400-e29b-41d4-a716-446655440001","title":"Admin Book","ISBN":"999-1-00000-00-0","authors":["Admin"],"coverPage":"admin.jpg"}' \
+  -w "\nHTTP Status: %{http_code}\n"
+
+#localhost test
+export AWS_REGION=ap-southeast-2
+sam local start-api --port 3000
 
 curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzY2NjE3OTUyfQ.21HaKeErQkD1SDPzdr6I8GkEacpaDYIyYceayB_fblE" \
-  http://localhost:3000/api/books
+  http://localhost:5000/api/books -w "\nHTTP Status: %{http_code}\n"
+
+curl -X POST https://oveffvl3dk.execute-api.ap-southeast-2.amazonaws.com/api/books \
+  -H "Authorization: Bearer eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAibm9ybWFsLXVzZXIiLCAicm9sZSI6ICJ1c2VyIiwgImV4cCI6IDE3NjY1ODEzODh9.DxetiTzpmj0rBcg3zmGydTehqb9fP7p6WYMFZxvIcI4" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"User Book","isbn":"888-1-00000-00-0","authors":["User"],"coverPage":"user.jpg"}' \
+   -w "\nHTTP Status: %{http_code}\n"
+   

@@ -1,0 +1,37 @@
+cat > /tmp/gen_tokens.py << 'EOF'
+import base64
+import json
+import hmac
+import hashlib
+from datetime import datetime, timedelta
+
+secret = "your-secret-key-change-this-in-production"
+
+def create_jwt(sub, role):
+    # Header
+    header = {"alg": "HS256", "typ": "JWT"}
+    header_encoded = base64.urlsafe_b64encode(json.dumps(header).encode()).rstrip(b'=').decode()
+    
+    # Payload
+    now = datetime.utcnow()
+    exp = int((now + timedelta(hours=1)).timestamp())
+    payload = {"sub": sub, "role": role, "exp": exp}
+    payload_encoded = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b'=').decode()
+    
+    # Signature
+    message = f"{header_encoded}.{payload_encoded}"
+    signature = hmac.new(secret.encode(), message.encode(), hashlib.sha256).digest()
+    signature_encoded = base64.urlsafe_b64encode(signature).rstrip(b'=').decode()
+    
+    return f"{message}.{signature_encoded}"
+
+admin_token = create_jwt("admin-user", "admin")
+user_token = create_jwt("normal-user", "user")
+
+print("Admin Token (role: admin):")
+print(admin_token)
+print("\nUser Token (role: user):")
+print(user_token)
+EOF
+
+python3 /tmp/gen_tokens.py

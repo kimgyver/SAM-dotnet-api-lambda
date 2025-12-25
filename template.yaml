@@ -9,20 +9,30 @@ Globals:
     Timeout: 60
 
 Resources:
+  JwtAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: JWT Token Authorizer for API Gateway
+      CodeUri: ./src/ServerlessAPI/
+      Handler: ServerlessAPI::ServerlessAPI.JwtAuthorizerFunction::FunctionHandler
+      Runtime: dotnet8
+      MemorySize: 256
+      Environment:
+        Variables:
+          JWT_SECRET: "your-secret-key-change-this-in-production"
+
   NetCodeWebAPIServerless:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function
     Properties:
       Description: A simple example includes a .NET Core WebAPI App with DynamoDB table.
       CodeUri: ./src/ServerlessAPI/
       Handler: ServerlessAPI
       Runtime: dotnet8
       MemorySize: 1024
-      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+      Environment:
         Variables:
           SAMPLE_TABLE: !Ref SampleTable
-          JWT_SECRET: "your-secret-key-change-this-in-production"
       Policies:
-        # Give Create/Read/Update/Delete Permissions to the SampleTable
         - DynamoDBCrudPolicy:
             TableName: !Ref SampleTable
       Events:
@@ -39,7 +49,21 @@ Resources:
             Method: ANY
             TimeoutInMillis: 30000
 
-  # DynamoDB table to store item: {id: &lt;ID&gt;, name: &lt;NAME&gt;}
+  ServerlessHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Auth:
+        DefaultAuthorizer: JwtAuthorizer
+        Authorizers:
+          JwtAuthorizer:
+            FunctionArn: !GetAtt JwtAuthorizerFunction.Arn
+            AuthorizerPayloadFormatVersion: "2.0"
+            Identity:
+              ReauthorizeEvery: 3600
+              Headers:
+                - Authorization
+
+  # DynamoDB table to store item: {id: <ID>, name: <NAME>}
   SampleTable:
     Type: AWS::Serverless::SimpleTable
     Properties:
